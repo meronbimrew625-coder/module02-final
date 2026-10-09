@@ -1,98 +1,178 @@
 const state = {
-    product: [],
-    wishlist: [],
+    products: [],
+    wishList: [],
     search: ""
 };
-const productsEl = document.getElementById("products");
-const wishlistEl = document.getElementById("wish-list");
-const searchForm = document.getElementById("searchForm");
-const searchInput = document.getElementById("searchInput");
-const message = document.getElementById("message");
 
-async function getProducts() {
-    message.textContent = "Loading...";
+const API = "https://dummyjson.com/products";
+
+const productEl = document.getElementById("products");
+const wishEl = document.getElementById("wish-list");
+const searchEl = document.getElementById("searchInput");
+const formEl = document.getElementById("searchForm");
+const messageEl = document.getElementById("message");
+
+
+async function loadProduct(query) {
+    messageEl.innerHTML = "Loading...";
 
     try {
-        const response = await fetch("https://dummyjson.com/products");
+        const response = await fetch(`${API}/search?q=${query}`);
 
         if (!response.ok) {
-            throw new Error("Failed to fetch products");
+            throw new Error("Failed to load products");
         }
 
         const data = await response.json();
 
-        state.product = data.products;
 
-        message.textContent = "";
+        state.products = data.products;
 
-        renderProducts();
+        messageEl.innerHTML = "";
+
+        render();
+
     } catch (error) {
-        message.textContent = "Error loading products";
+        messageEl.innerHTML = "Could not load Products.";
+        console.log(error);
     }
 }
 
-function renderProducts() {
-    const filteredProducts = state.product.filter((product) =>
-        product.title.toLowerCase().includes(state.search.toLowerCase())
-    );
-
-    productsEl.innerHTML = filteredProducts
-        .map((product) => createCard(product))
-        .join("");
-
-    if (filteredProducts.length === 0) {
-        productsEl.innerHTML = "<p>No products found.</p>";
-    }
-}
 
 function createCard(product) {
-    return `
-        <div class="card">
+    const image = product.thumbnail;
 
-            <img src="${product.thumbnail}" alt="${product.title}">
+    const isWished = state.wishList.some(
+        (wish) => wish.id === product.id
+    );
+
+    return `
+        <article class="card">
+            <img src="${image}" alt="${product.title}">
 
             <div class="card-content">
-
                 <h3>${product.title}</h3>
 
                 <p>${product.category}</p>
 
                 <p>$${product.price}</p>
 
-                <p>${product.rating}</p>
+                <p>
+                    Rating: ${product.rating ?? "N/A"}
+                </p>
 
-                <button onclick="addToWishlist(${product.id})">
-                    ♡ Wishlist
+                <button onclick="addOrRemoveWish(${product.id})">
+                    ${isWished ? "Remove" : "Wish"}
                 </button>
-
             </div>
-
-        </div>
+        </article>
     `;
 }
 
-function addToWishlist(id) {
-    const product = state.product.find(
-        (item) => item.id === id
+
+function render() {
+    const title = state.search.toLowerCase();
+
+    const filteredProducts = state.products.filter((product) =>
+        product.title.toLowerCase().includes(title)
     );
 
-    state.wishlist.push(product);
+// show massage if no product is found
 
-    renderWishlist();
-}
+    if(filteredProducts.length === 0){
+        messageEl.innerHTML = "Product not found.";
+    }else{
+        messageEl.innerHTML = "";
+    }
 
-function renderWishlist() {
-    wishlistEl.innerHTML = state.wishlist
+
+
+    productEl.innerHTML = filteredProducts
         .map((product) => createCard(product))
         .join("");
+
+    wishEl.innerHTML = state.wishList
+        .map((product) => createCard(product))
+        .join("");
+    
+    // show wishlist only when it has products
+    
+    const wishlistSection = document.getElementById("wish-section");
+
+    if(state.wishList.length > 0){
+        wishlistSection.style.display = "block";
+
+    }else{
+        wishlistSection.style.display = "none";
+    }
 }
 
-searchForm.addEventListener("submit", function (event) {
+
+function saveWishs() {
+    localStorage.setItem(
+        "wishs",
+        JSON.stringify(state.wishList)
+    );
+}
+
+
+function loadWishs() {
+    state.wishList =
+        JSON.parse(localStorage.getItem("wishs")) || [];
+}
+
+
+function addOrRemoveWish(id) {
+    const exists = state.wishList.find(
+        (product) => product.id === id
+    );
+
+    if (exists) {
+        state.wishList = state.wishList.filter(
+            (product) => product.id !== id
+        );
+    } else {
+        const product = state.products.find(
+            (product) => product.id === id
+        );
+
+        if (product) {
+            state.wishList.push(product);
+        }
+    }
+
+    saveWishs();
+    render();
+}
+
+
+formEl.addEventListener("submit", function (event) {
     event.preventDefault();
 
-    state.search = searchInput.value;
+    const query = searchEl.value.trim();
 
-    renderProducts();
+    if (!query) {
+        return;
+    }
+
+    state.search = query;
+
+    loadProduct(query);
 });
+function goToWishlist() {
+    document.getElementById("wish-list").scrollIntoView({
+        behavior: "smooth"
+    });
+}
 
-getProducts();
+function init() {
+    loadWishs();
+
+    state.search = "";
+
+    loadProduct("");
+}
+
+
+init();
+
